@@ -1,10 +1,10 @@
-const regexBoundary = /Content-Type: multipart\/([a-z]+); boundary=(.*)/g;
-const regexContentType = /Content-Type:\s([a-zA-Z0-9\/=+]+);\scharset=([a-zA-Z0-9\/=+-]+)/g;
-const regexContentTransferEncoding = /Content-Transfer-Encoding:\s([a-zA-Z0-9\/=+]+)/g;
+const regexBoundary = /boundary=(.*)/g;
+const regexContentType = /Content-Type:\s([a-zA-Z0-9\/=+]+);\scharset=(.*)/g;
+const regexContentTransferEncoding = /Content-Transfer-Encoding:\s(.*)/g;
 
 const regexContentTypeAttachment = /Content-Type:\s([a-zA-z\/]+);\sname="(.*)"/g;
 const regexContentDisposition = /Content-Disposition:\s([a-zA-z\/]+);\sfilename="(.*)"/g;
-const regexContentAttachmentTransferEncoding = /Content-Transfer-Encoding:\s([a-zA-z\/0-9]+)/g;
+const regexContentAttachmentTransferEncoding = /Content-Transfer-Encoding:\s(.*)/g;
 const regexContentId = /Content-ID:\s(.*)/g;
 const regexXAttachmentId = /X-Attachment-Id:\s(.*)/g;
 
@@ -35,7 +35,8 @@ function codeline_MailParser(data) {
 
 		if(line.match(regexBoundary)) {
 			boundaryTmp = regexBoundary.exec(line);
-			boundary = boundaryTmp[2];
+			boundary = boundaryTmp[1].replace(/\"/g, '');
+			console.log(boundary);
 			boundaries.push("--" + boundary+"\r");
 			boundaries.push("--" + boundary + "--\r");
 			rawMessage.push(line);
@@ -84,8 +85,14 @@ function codeline_MailParser(data) {
 			}
 			
 			if(parsing == "text/plain") {
+				if(line.match(regexContentAttachmentTransferEncoding)) {
+					return;
+				}
 				dataText += line + "\n";
 			} else if(parsing == "text/html") {
+				if(line.match(regexContentAttachmentTransferEncoding)) {
+					return;
+				}
 				dataHtml += line + "\n" ;
 			} else {
 				if(line != "\r") {
@@ -124,6 +131,35 @@ function codeline_MailParser(data) {
 
 	});
 
-	return {text: dataText, textCharset: charsetText, html: dataHtml, charsetHtml: charsetHtml, attachments: attachments, rawMessage: rawMessage.join("\n")};
+	rawContentType = "";
+	rawContentTransferEncoding = "";
+	parsing = false;
+	if(rawMessage.length == 0) {
+		data.toString().split("\n").forEach(function(line) {
+			if(line.match(regexContentType)) {
+				rawContentType = line.replace("\r", "");
+				return;
+			}
+			if(line.match(regexContentAttachmentTransferEncoding)) {
+				rawContentTransferEncoding = line.replace("\r", "");
+				return;
+			}
+			if(line == "\r") parsing = true;
+			if(parsing) {
+				rawMessage.push(line);
+			}
+		});
+	}
+
+	return {
+		text: dataText,
+		textCharset: charsetText,
+		html: dataHtml,
+		charsetHtml: charsetHtml,
+		attachments: attachments,
+		rawContentType: rawContentType,
+		rawContentTransferEncoding: rawContentTransferEncoding,
+		rawMessage: rawMessage.join("\n")
+	};
 
 }
