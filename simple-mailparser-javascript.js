@@ -1,4 +1,5 @@
 const regexBoundary = /boundary=(.*)/g;
+const regexContentTypeWithoutBoundary = /Content-Type:\s([a-zA-Z0-9\/=+]+);\r/g;
 const regexContentType = /Content-Type:\s([a-zA-Z0-9\/=+]+);\scharset=(.*)/g;
 const regexContentTransferEncoding = /Content-Transfer-Encoding:\s(.*)/g;
 
@@ -32,6 +33,11 @@ function codeline_MailParser(data) {
 	var tmp_data = "";
 
 	data.toString().split("\n").forEach(function(line) {
+
+		if(line.match(regexContentTypeWithoutBoundary)) {
+			rawMessage.push(line);
+			return;
+		}
 
 		if(line.match(regexBoundary)) {
 			boundaryTmp = regexBoundary.exec(line);
